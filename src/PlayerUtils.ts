@@ -6,11 +6,13 @@ import {
 	ItemStack,
 	Player,
 	Vector3,
+	system,
 	world,
 } from "@minecraft/server";
-import { Mathn } from "./Mathn";
+
 import { InventoryUtils } from "./InventoryUtils";
 import { ItemStackUtils } from "./ItemStackUtils";
+import { Mathn } from "./Mathn";
 import { Vector3n } from "./Vector3n";
 
 /**
@@ -208,14 +210,15 @@ export class PlayerUtils {
 	 * Adds the item to the player's inventory, but if full, drops it in the world.
 	 * @param player
 	 * @param itemStack
+	 * @param dropOnFull Whether to drop the item on the ground if the inventory is full.
 	 * @returns
 	 */
-	static addInventoryItem(player: Player, itemStack: ItemStack): void {
+	static addInventoryItem(player: Player, itemStack: ItemStack, dropOnFull = true): void {
 		const container = player.getComponent(EntityComponentTypes.Inventory)?.container;
 		if (container) {
 			if (container.emptySlotsCount !== 0) {
 				container.addItem(itemStack);
-			} else {
+			} else if (dropOnFull) {
 				let pos = player.getHeadLocation();
 				pos.y -= 0.225;
 				const item = player.dimension.spawnItem(itemStack, pos);
@@ -247,5 +250,22 @@ export class PlayerUtils {
 		const maxZ = Math.max(corner1.z, corner2.z);
 
 		return x >= minX && x <= maxX && y >= minY && y <= maxY && z >= minZ && z <= maxZ;
+	}
+
+	/**
+	 * Waits for player to press a move input before calling callback.
+	 * Used for delaying API calls that require the player to be fully-loaded to execute.
+	 * (e.g., playing sounds, displaying server forms)
+	 * @param player
+	 * @param callback
+	 */
+	static waitForMoveInput(player: Player, callback: () => void) {
+		const runId = system.runInterval(() => {
+			const v = player.inputInfo.getMovementVector();
+			if (v.x !== 0 || v.y !== 0) {
+				system.clearRun(runId);
+				callback();
+			}
+		});
 	}
 }
